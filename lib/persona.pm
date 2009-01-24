@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # set version info
-our $VERSION  = 0.01;
+our $VERSION  = 0.02;
 
 # modules that we need
 use List::MoreUtils qw( any first_index );
@@ -132,7 +132,7 @@ sub _inc_handler {
     }
 
     # can't find ourselves?
-    my $first = first_index { $_ == $self } @INC;
+    my $first = first_index { $_ eq $self } @INC;
     die "Could not find INC handler in @INC" if !++$first;
 
     # could not find file, let require handle it (again)
@@ -267,7 +267,7 @@ __END__
 
 =head1 NAME
 
-persona - control which code will be loaded for a persona
+persona - control which code will be loaded for an execution context
 
 =head1 SYNOPSIS
 
@@ -296,7 +296,7 @@ persona - control which code will be loaded for a persona
 
 =head1 VERSION
 
-This documentation describes version 0.01.
+This documentation describes version 0.02.
 
 =head1 DESCRIPTION
 
@@ -455,6 +455,15 @@ at L<http://cpanratings.perl.org/rate/?distribution=persona>.
 Inspired by the function of L<load> and L<ifdef> modules from the same author.
 And thanks to the pressure (perhaps unknowingly) exerted by the Amsterdam Perl
 Mongers.
+
+=head1 CAVEATS
+
+=head2 %INC SETTING
+
+As a side effect of having a Perl subroutine handle the source code of a file,
+Perl will fill in the C<code reference> as the value in the C<%INC> hash, rather
+than the file from which the code as actually read.  This may cause probles
+with modules that perform C<%INC> introspection.
 
 =head1 AUTHOR
 

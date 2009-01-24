@@ -1,2 +1,5 @@
+0.02	24 January 2009
+	Changed the abstract.  Fixed some warnings.  Added a CAVEATS section.
+
 0.01	23 January 2009
 	First version of persona.pm.
