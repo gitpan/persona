@@ -5,11 +5,10 @@ use strict;
 use warnings;
 
 # set version info
-our $VERSION  = 0.03;
+our $VERSION  = 0.04;
 
 # modules that we need
-use List::MoreUtils qw( any first_index );
-use List::Util      qw( first );
+use List::Util qw( first );
 
 # persona and semaphore to indicate @INC watcher is installed for this process
 my $process_persona;
@@ -308,17 +307,17 @@ sub _inc_handler {
     my ( $self, $file ) = @_;
 
     # shouldn't handle this file, let require handle it (again)
-    if ( !any { $file =~ m#$_# } @only_for ) {
+    if ( !grep { $file =~ m#$_# } @only_for ) {
         TELL 'Not handling %s', $file if DEBUG > 1;
         return undef;
     }
 
     # can't find ourselves?
-    my $first = first_index { $_ eq $self } @INC;
-    die "Could not find INC handler in @INC" if !++$first;
+    my $first = first { $INC[$_] eq $self } 0 .. $#INC;
+    die "Could not find INC handler in @INC" if !defined $first;
 
     # could not find file, let require handle it (again)
-    my $path = first { -e } map { "$INC[$_]/$file" } $first .. $#INC;
+    my $path = first { -e } map { "$INC[$_]/$file" } $first + 1 .. $#INC;
     if ( !$path ) {
         TELL 'Could not find %s', $file if DEBUG > 1;
         return undef;
@@ -377,7 +376,7 @@ persona - control which code will be loaded for an execution context
 
 =head1 VERSION
 
-This documentation describes version 0.03.
+This documentation describes version 0.04.
 
 =head1 DESCRIPTION
 

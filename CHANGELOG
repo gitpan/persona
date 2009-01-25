@@ -1,3 +1,8 @@
+0.04	25 January 2009
+	Removed dependency to non-core module List::MoreUtils.  Got so used
+	to using that module that I incorrectly assumed it was core (well,
+	maybe it should be ;-).  Spotted by Frank Wiegand.
+
 0.03	25 January 2009
 	Externalized parsing logic in "path2source" class method.
 
