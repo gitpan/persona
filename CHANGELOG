@@ -1,3 +1,12 @@
+0.06	26 January 2009
+	Removed the -require- handler: it is possible to set %INC from the
+	@INC handler (I should have read the "perldoc -f require" more
+	carefully.
+
+	Now uses the normal handling If there are no skipped lines found:
+	if there are, __FILE__ is now set to what it would be without it
+	having been processed.
+
 0.05	25 January 2009
 	Added code to have any errors in -require- be reported from the "right"
 	location, to avoid code breakage by stupid core modules such as

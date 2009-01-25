@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # set version info
-our $VERSION  = 0.05;
+our $VERSION  = 0.06;
 
 # modules that we need
 use List::Util qw( first );
@@ -15,9 +15,6 @@ my $process_persona;
 
 # regular expression to check
 my @only_for;
-
-# filename to path mapping of files done here
-my %file2path;
 
 # are we debugging?
 BEGIN {
@@ -34,65 +31,6 @@ BEGIN {
              printf STDERR $format, @_;
          }
        : sub { };
-}    #BEGIN
-
-=for Explanation:
-     We're going to install a -require- handler purely for the capability of
-     setting %INC to the file name of the source having been parsed, rather
-     than the stringification of the CODE ref that is installed in @INC (which
-     is what perl does when it gets a handle returned by the @INC handler).
-
-=cut
-
-BEGIN {
-
-    # dirty stuff going on here
-    no strict 'refs';
-    no warnings 'redefine';
-
-=for Explanation:
-     Although rare, it *is* possible to another -require- handler is installed
-     already.  As we're law abiding citizens, we're going to abide by what that
-     -require- handler is already doing.  Otherwise, we're just going to call
-     the core -require- functionality.
-
-=cut
-
-    my $old = \&CORE::GLOBAL::require;
-    eval {$old->()};
-    $old = undef if $@ =~ m#CORE::GLOBAL::require#;
-
-    # install our own -require- handler
-    *CORE::GLOBAL::require = sub {
-        my ($file) = @_;
-
-=for Explanation:
-     Some core modules, such as base.pm, have very broken ways of handling the
-     result of a compilation error.  As a result, any extra level in the stack
-     for -require- may break code.  So we cannot just call -require- here,
-     we need to make sure that any error in the require will actually report
-     one level up.  So *if* there is a problem, we fetch the caller info one
-     level up, and replace our location by the one one level up.  Yuck!  But
-     it seems to work.  The only alternative would be to mess with CORE::caller,
-     which would be even more messier than this.
-
-=cut
-
-        my $ret;
-        if ( !eval { $ret = $old ? $old->($file) : CORE::require($file); 1 } ) {
-            my ( undef, $filename, $line ) = caller;
-            $@ =~ s# at [\w/\.]*persona.pm line \d+.# at $filename line $line#;
-            die $@;
-        }
-
-
-        # make sure %INC is set to the file name if it was handled by us
-        if ( my $path = delete $file2path{$file} ) {
-            $INC{$file} = $path;
-        }
-
-        return $ret;
-    };
 }    #BEGIN
 
 # satisfy -require-
@@ -343,13 +281,15 @@ sub _inc_handler {
     # parse the source
     my ( $source, $skipped ) = __PACKAGE__->path2source($path);
 
-    # could not open file, let require handle it (again), to fail properly
-    return undef if !$source;
+    # could not open file, or nothing skipped, let -require- handle it
+    return undef if !$source or !$skipped;
 
-    # keep info for later fixing %INC
-    $file2path{$file} = $skipped
-      ? "$path (skipped $skipped lines for persona '$process_persona')"
-      : $path;  # just as if nothing has happened
+    # set %INC correctly
+    $INC{$file} =
+      "$path (skipped $skipped lines for persona '$process_persona')";
+
+    # make sure that __FILE__ will be correct as well
+    $$source = "#line 1 $path\n$$source";
 
     # convert source to handle, so require can handle it
     open( my $require, '<', $source )
@@ -393,7 +333,7 @@ persona - control which code will be loaded for an execution context
 
 =head1 VERSION
 
-This documentation describes version 0.05.
+This documentation describes version 0.06.
 
 =head1 DESCRIPTION
 
@@ -580,21 +520,15 @@ Mongers.
 
 =head2 %INC SETTING
 
-As a side effect of having a Perl subroutine handle the source code of a file,
-Perl will fill in the C<code reference> as the value in the C<%INC> hash, rather
-than the file from which the code as actually read.  Therefore this module
-installs a -require- handler that will just do the normal processing, but when
-it is done, will set the %INC entry for the file processed to the proper path
-(instead of a stringification of the code reference of the @INC handler that
-this module installs).
-
-Please note that if any lines were removed from the source, the path name will
-be postfixed with the string:
+Please note that if any lines were removed from the source, the path name in
+C<%INC> will be postfixed with the string:
 
   (skipped %d lines for persona '%s')
 
 where the %d will be filled with the number of lines skipped, and the %s will
-be filled with the persona for which the lines were removed.
+be filled with the persona for which the lines were removed.  Also note that
+the __FILE__ compiler constant will B<not> have this information postfixed,
+as that is more or less expected to be just containing a path at all times.
 
 =head1 AUTHOR
 
