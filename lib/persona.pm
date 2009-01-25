@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # set version info
-our $VERSION  = 0.04;
+our $VERSION  = 0.05;
 
 # modules that we need
 use List::Util qw( first );
@@ -18,6 +18,23 @@ my @only_for;
 
 # filename to path mapping of files done here
 my %file2path;
+
+# are we debugging?
+BEGIN {
+    my $debug = $ENV{DEBUG} || 0;
+    $debug = 0 if $debug !~ m#^[0-9]+$#; ## only numeric constants
+    eval "sub DEBUG () { $debug }";
+}    #BEGIN
+
+# log pipe if we're debugging
+BEGIN {
+    *TELL = DEBUG
+       ? sub {
+             my $format = shift() . "\n";
+             printf STDERR $format, @_;
+         }
+       : sub { };
+}    #BEGIN
 
 =for Explanation:
      We're going to install a -require- handler purely for the capability of
@@ -49,33 +66,33 @@ BEGIN {
     *CORE::GLOBAL::require = sub {
         my ($file) = @_;
 
-        # do all of the normal actions
-        my $return = $old ? $old->($file) : CORE::require($file);
+=for Explanation:
+     Some core modules, such as base.pm, have very broken ways of handling the
+     result of a compilation error.  As a result, any extra level in the stack
+     for -require- may break code.  So we cannot just call -require- here,
+     we need to make sure that any error in the require will actually report
+     one level up.  So *if* there is a problem, we fetch the caller info one
+     level up, and replace our location by the one one level up.  Yuck!  But
+     it seems to work.  The only alternative would be to mess with CORE::caller,
+     which would be even more messier than this.
+
+=cut
+
+        my $ret;
+        if ( !eval { $ret = $old ? $old->($file) : CORE::require($file); 1 } ) {
+            my ( undef, $filename, $line ) = caller;
+            $@ =~ s# at [\w/\.]*persona.pm line \d+.# at $filename line $line#;
+            die $@;
+        }
+
 
         # make sure %INC is set to the file name if it was handled by us
         if ( my $path = delete $file2path{$file} ) {
             $INC{$file} = $path;
         }
 
-        return $return;
+        return $ret;
     };
-}    #BEGIN
-
-# are we debugging?
-BEGIN {
-    my $debug = $ENV{DEBUG} || 0;
-    $debug = 0 if $debug !~ m#^[0-9]+$#; ## only numeric constants
-    eval "sub DEBUG () { $debug }";
-}    #BEGIN
-
-# log pipe if we're debugging
-BEGIN {
-    *TELL = DEBUG
-       ? sub {
-             my $format = shift() . "\n";
-             printf STDERR $format, @_;
-         }
-       : sub { };
 }    #BEGIN
 
 # satisfy -require-
@@ -307,7 +324,7 @@ sub _inc_handler {
     my ( $self, $file ) = @_;
 
     # shouldn't handle this file, let require handle it (again)
-    if ( !grep { $file =~ m#$_# } @only_for ) {
+    if ( !first { $file =~ m#$_# } @only_for ) {
         TELL 'Not handling %s', $file if DEBUG > 1;
         return undef;
     }
@@ -376,7 +393,7 @@ persona - control which code will be loaded for an execution context
 
 =head1 VERSION
 
-This documentation describes version 0.04.
+This documentation describes version 0.05.
 
 =head1 DESCRIPTION
 

@@ -1,3 +1,9 @@
+0.05	25 January 2009
+	Added code to have any errors in -require- be reported from the "right"
+	location, to avoid code breakage by stupid core modules such as
+	"base.pm" that seem to depend on specific call stack info when a
+	-require- fails.
+
 0.04	25 January 2009
 	Removed dependency to non-core module List::MoreUtils.  Got so used
 	to using that module that I incorrectly assumed it was core (well,
