@@ -1,3 +1,11 @@
+0.03	25 January 2009
+	Externalized parsing logic in "path2source" class method.
+
+	Added -require- handler so that we can properly set the %INC setting
+	of the processed file.  Adapted CAVEATS section accordingly.
+
+	And more tests of course.
+
 0.02	24 January 2009
 	Changed the abstract.  Fixed some warnings.  Added a CAVEATS section.
 

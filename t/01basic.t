@@ -32,6 +32,7 @@ print "one and two\\n";
 print "not one\\n";
 #PERSONA
 print "all in Foo again\\n";
+1;
 __END__
 #PERSONA one
 print "one should never show\\n";
@@ -60,32 +61,34 @@ all in Foo again
 ALL
 
 # no interference from persona whatsoever
-foreach my $prefix ( '', 'PERSONA=zero ', 'PERSONA=one ', 'PERSONA=two ' ) {
-    open( $out, "$prefix$^X -I. $postfix" );
+foreach ( '', 'PERSONA=zero ', 'PERSONA=one ', 'PERSONA=two ' ) {
+    my $prefix .= "$_$^X -I.";
+    open( $out, "$prefix $postfix" );
     is( readline($out), $all, "$prefix no interference" );
-    open( $out, "$prefix$^X -I. -Mpersona $postfix" );
+    open( $out, "$prefix -Mpersona $postfix" );
     is( readline($out), $all, "$prefix no module selected, no interference" );
-    open( $out, "$prefix$^X -I. -Mpersona=only_for,Bar $postfix" );
+    open( $out, "$prefix -Mpersona=only_for,Bar $postfix" );
     is( readline($out), $all, "$prefix Bar module selected, no interference" );
 }
 
 # interference
-open( $out, "$^X -I. -Mpersona=only_for,Foo $postfix" );
+my $prefix = "$^X -I.";
+open( $out, "$prefix -Mpersona=only_for,Foo $postfix" );
 is( readline($out), $all, 'Foo module selected, no PERSONA, no interference' );
-open( $out, "PERSONA=zero $^X -I. -Mpersona=only_for,Foo $postfix" );
+open( $out, "PERSONA=zero $prefix -Mpersona=only_for,Foo $postfix" );
 is( readline($out), <<'OK', 'Foo module selected, PERSONA zero' );
 all in Foo
 not one
 all in Foo again
 OK
-open( $out, "PERSONA=one $^X -I. -Mpersona=only_for,Foo $postfix" );
+open( $out, "PERSONA=one $prefix -Mpersona=only_for,Foo $postfix" );
 is( readline($out), <<'OK', 'Foo module selected, PERSONA one' );
 all in Foo
 one only
 one and two
 all in Foo again
 OK
-open( $out, "PERSONA=two $^X -I. -Mpersona=only_for,Foo $postfix" );
+open( $out, "PERSONA=two $prefix -Mpersona=only_for,Foo $postfix" );
 is( readline($out), <<'OK', 'Foo module selected, PERSONA two' );
 all in Foo
 one and two

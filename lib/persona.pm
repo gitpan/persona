@@ -5,17 +5,62 @@ use strict;
 use warnings;
 
 # set version info
-our $VERSION  = 0.02;
+our $VERSION  = 0.03;
 
 # modules that we need
 use List::MoreUtils qw( any first_index );
 use List::Util      qw( first );
 
-# persona and semaphore to indicate @INC watcher is installed
-my $persona;
+# persona and semaphore to indicate @INC watcher is installed for this process
+my $process_persona;
 
 # regular expression to check
 my @only_for;
+
+# filename to path mapping of files done here
+my %file2path;
+
+=for Explanation:
+     We're going to install a -require- handler purely for the capability of
+     setting %INC to the file name of the source having been parsed, rather
+     than the stringification of the CODE ref that is installed in @INC (which
+     is what perl does when it gets a handle returned by the @INC handler).
+
+=cut
+
+BEGIN {
+
+    # dirty stuff going on here
+    no strict 'refs';
+    no warnings 'redefine';
+
+=for Explanation:
+     Although rare, it *is* possible to another -require- handler is installed
+     already.  As we're law abiding citizens, we're going to abide by what that
+     -require- handler is already doing.  Otherwise, we're just going to call
+     the core -require- functionality.
+
+=cut
+
+    my $old = \&CORE::GLOBAL::require;
+    eval {$old->()};
+    $old = undef if $@ =~ m#CORE::GLOBAL::require#;
+
+    # install our own -require- handler
+    *CORE::GLOBAL::require = sub {
+        my ($file) = @_;
+
+        # do all of the normal actions
+        my $return = $old ? $old->($file) : CORE::require($file);
+
+        # make sure %INC is set to the file name if it was handled by us
+        if ( my $path = delete $file2path{$file} ) {
+            $INC{$file} = $path;
+        }
+
+        return $return;
+    };
+}    #BEGIN
 
 # are we debugging?
 BEGIN {
@@ -37,11 +82,147 @@ BEGIN {
 # satisfy -require-
 1;
 
-#---------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#
+# Class methods
+#
+#-------------------------------------------------------------------------------
+# path2source
+#
+# Convert a given handle to source code for a given persona
+#
+#  IN: 1 class (ignored)
+#      2 path
+#      3 persona to parse for (default: current)
+# OUT: 1 scalar reference to source code or undef
+#      2 number of lines skipped (optional)
+
+sub path2source {
+    my ( undef, $path, $persona ) = @_;
+    $persona = $process_persona if !defined $persona;
+
+    # could not open file, let the outside handle this
+    open( my $handle, '<', $path ) or return;
+    TELL 'Parsing %s', $path if DEBUG;
+
+    # initializations
+    my $skipped = 0;
+    my $done;
+    my $active  = 1;
+    my $line_nr = 0;
+    my $source  = '';
+
+    # until we reach end of file
+  LINE:
+    while (1) {
+        my $line = readline $handle;
+        last LINE if !defined $line;
+
+        # seen __END__ or __DATA__, no further looking needed here
+        if ($done) {
+            $source .= $line;
+            next LINE;
+        }
+
+        # reached the end of logical code, continue without further looking
+        elsif ( $line =~ m#^__(?:DATA|END)__$# ) {  ## syn hilite
+            $done = 1;
+            $source .= $line;
+            next LINE;
+        }
+
+        # we've seen a line and want to remember that
+        $line_nr++;
+
+        # code for new persona?
+        if ( $line =~ m/^#PERSONA\s*(.*)/ ) {
+            my $rest = $1;
+
+            # all personas
+            if ( !$rest ) {
+
+                # switching from inactive persona to all
+                if ( !$active ) {
+                    $active = 1;
+
+                    # make sure errors / stack traces have right line info
+                    $source .= sprintf "#line %d %s (all personas)\n",
+                      $line_nr + 1, $path;
+
+                    # don't bother adding the line with #PERSONA
+                    next LINE;
+                }
+            }
+
+            # we have a negation
+            elsif ( $rest =~ m#^!\s*(\w+)\s*$# ) { ## syn hilite
+
+                # all but the current persona
+                if ( $1 eq $persona ) {
+                    $active  = undef;
+                }
+
+                # switching from inactive persona to all
+                elsif ( !$active ) {
+                    $active = 1;
+
+                    # make sure errors / stack traces have right line info
+                    $source .= sprintf "#line %d %s (all but persona '%s')\n",
+                      $line_nr + 1, $path, $1;
+
+                    # don't bother adding the line with #PERSONA
+                    next LINE;
+                }
+            }
+
+            # we need to allow for this persona
+            elsif ( $rest =~ m#\b$persona\b# ) {
+
+                # switching from inactive persona to active one
+                if ( !$active ) {
+                    $active = 1;
+
+                    # make sure errors / stack traces have right line info
+                    $source .=
+                      sprintf "#line %d %s (allowed by persona '%s')\n",
+                      $line_nr + 1, $path, $persona;
+
+                    # don't bother adding the line with #PERSONA
+                    next LINE;
+                }
+            }
+
+            # don't allow for this persona
+            else {
+                $active  = undef;
+            }
+        }
+
+        # we're not doing this line
+        $skipped++, next LINE if !$active;
+
+        # new package, make sure it knows about PERSONA if it doesn't yet
+        if ( $line =~ m#^\s*package\s+([\w:]+)\s*;# ) {
+            no strict 'refs';
+            my $sub = $1 . '::PERSONA';
+            *{$sub} = \&main::PERSONA if !exists &$sub;
+        }
+
+        # we'll do this line
+        $source .= $line;
+    }
+
+    # show source if *really* debugging
+    TELL $source if DEBUG > 2;
+
+    return wantarray ? ( \$source, $skipped ) : \$source;
+}    #path2source
+
+#-------------------------------------------------------------------------------
 #
 # Standard Perl features
 #
-#---------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # import
 #
 #  IN: 1 class (ignored)
@@ -51,25 +232,26 @@ sub import {
     my ( undef, %attr ) = @_;
 
     # find persona we need to work for
-    if ( !defined $persona ) {
-        $persona = $ENV{ENV_PERSONA}
+    if ( !defined $process_persona ) {
+        $process_persona = $ENV{ENV_PERSONA}
           ? $ENV{ $ENV{ENV_PERSONA} }
           : $ENV{PERSONA};
 
         # too bad, we don't have a persona
-        $persona = '' if !defined $persona;
+        $process_persona = '' if !defined $process_persona;
 
         # force some sanity
-        die "Persona may only contain alphanumeric characters, e.g. '$persona'"
-          if $persona =~ s#\W##sg;
+        die "Persona may only contain alphanumeric characters,"
+          . " e.g. '$process_persona'"
+          if $process_persona =~ s#\W##sg;
 
         # create constant in main (for easy access later)
-        die $@ if !eval "sub main::PERSONA () { '$persona' }; 1";
+        die $@ if !eval "sub main::PERSONA () { '$process_persona' }; 1";
 
         # install handler if we have a persona
-        if ($persona) {
+        if ($process_persona) {
             unshift @INC, \&_inc_handler;
-            TELL 'Interpreting source code as "%s"', $persona if DEBUG;
+            TELL 'Interpreting source code as "%s"', $process_persona if DEBUG;
         }
     }
 
@@ -111,11 +293,11 @@ sub import {
     return;
 } #import
 
-#---------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 #
 # Internal subroutines
 #
-#---------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # _inc_handler
 #
 #  IN: 1 code reference to this sub
@@ -142,126 +324,25 @@ sub _inc_handler {
         return undef;
     }
 
-    # could not open file, let require handle it (again)
-    open( my $handle, '<', $path ) or return undef;
-    TELL 'Parsing %s', $path if DEBUG;
+    # parse the source
+    my ( $source, $skipped ) = __PACKAGE__->path2source($path);
 
-    # initializations
-    my $done;
-    my $active  = 1;
-    my $line_nr = 0;
-    my $source  = '';
+    # could not open file, let require handle it (again), to fail properly
+    return undef if !$source;
 
-    # until we reach end of file
-  LINE:
-    while (1) {
-        my $line = readline $handle;
-        last LINE if !defined $line;
-
-        # seen __END__ or __DATA__, no further looking needed here
-        if ($done) {
-            $source .= $line;
-            next LINE;
-        }
-
-        # reached the end of logical code, continue without further looking
-        elsif ( $line =~ m#^__(?:DATA|END)__$# ) {  ## syn hilite
-            $done = 1;
-            $source .= $line;
-            next LINE;
-        }
-
-        # we've seen a line and want to remember that
-        $line_nr++;
-
-        # code for new persona?
-        if ( $line =~ m/^#PERSONA\s*(.*)/ ) {
-            my $rest = $1;
-
-            # all persona's
-            if ( !$rest ) {
-
-                # switching from inactive persona to all
-                if ( !$active ) {
-                    $active = 1;
-
-                    # make sure errors / stack traces have right line info
-                    $source .= sprintf "#line %d %s (all personas)\n",
-                      $line_nr + 1, $path;
-
-                    # don't bother adding the line with #PERSONA
-                    next LINE;
-                }
-            }
-
-            # we have a negation
-            elsif ( $rest =~ m#^!\s*(\w+)\s*$# ) { ## syn hilite
-
-                # all but the current persona
-                if ( $1 eq $persona ) {
-                    $active = undef;
-                }
-
-                # switching from inactive persona to all
-                elsif ( !$active ) {
-                    $active = 1;
-
-                    # make sure errors / stack traces have right line info
-                    $source .= sprintf "#line %d %s (all but %s)\n",
-                      $line_nr + 1, $path, $persona;
-
-                    # don't bother adding the line with #PERSONA
-                    next LINE;
-                }
-            }
-
-            # we need to allow for this persona
-            elsif ( $rest =~ m#\b$persona\b# ) {
-
-                # switching from inactive persona to active one
-                if ( !$active ) {
-                    $active = 1;
-
-                    # make sure errors / stack traces have right line info
-                    $source .= sprintf "#line %d %s (allowed by %s)\n",
-                      $line_nr + 1, $path, $persona;
-
-                    # don't bother adding the line with #PERSONA
-                    next LINE;
-                }
-            }
-
-            # don't allow for this persona
-            else {
-                $active = undef;
-            }
-        }
-
-        # we're not doing this code
-        next LINE if !$active;
-
-        # new package, make sure it knows about PERSONA if it doesn't yet
-        if ( $line =~ m#^\s*package\s+([\w:]+)\s*;# ) {
-            no strict 'refs';
-            my $sub = $1 . '::PERSONA';
-            *{$sub} = \&main::PERSONA if !exists &$sub;
-        }
-
-        # we'll do this line
-        $source .= $line;
-    }
-
-    # show source if *really* debugging
-    TELL $source if DEBUG > 2;
+    # keep info for later fixing %INC
+    $file2path{$file} = $skipped
+      ? "$path (skipped $skipped lines for persona '$process_persona')"
+      : $path;  # just as if nothing has happened
 
     # convert source to handle, so require can handle it
-    open( my $require, '<', \$source )
+    open( my $require, '<', $source )
       or die "Could not open in-memory source for reading: $!";
-    
+
     return $require;
 }    #_inc_handler
 
-#---------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
 __END__
 
@@ -296,7 +377,7 @@ persona - control which code will be loaded for an execution context
 
 =head1 VERSION
 
-This documentation describes version 0.02.
+This documentation describes version 0.03.
 
 =head1 DESCRIPTION
 
@@ -438,6 +519,29 @@ Please do:
 
 for more information about @INC handlers.
 
+=head1 CLASS METHODS
+
+Some class methods are provided as building bricks for more advanced usage of
+the persona functionality.
+
+=head2 path2source
+
+ my $source_ref = persona->path2source($path);  # current persona
+
+ my ( $source_ref, $skipped ) = persona->path2source( $path, $persona );
+
+Process the file given by the absolute path name for the given persona.  Assume
+the current process' persona if none given.  Returns a reference to the scalar
+containing the processed source, or undef if the file could not be opened.
+Optionally also returns the number of lines in the original source that were
+skipped.
+
+This functionality is specifically handy for deployment procedures where source
+files are pre-processed for execution in their intended context, rather than
+doing this at compilation time each time.  This removes the need for having
+this module installed in production environments and reduces possible problems
+with wrong persona settings in an execution context.
+
 =head1 REQUIRED MODULES
 
  (none)
@@ -462,8 +566,19 @@ Mongers.
 
 As a side effect of having a Perl subroutine handle the source code of a file,
 Perl will fill in the C<code reference> as the value in the C<%INC> hash, rather
-than the file from which the code as actually read.  This may cause probles
-with modules that perform C<%INC> introspection.
+than the file from which the code as actually read.  Therefore this module
+installs a -require- handler that will just do the normal processing, but when
+it is done, will set the %INC entry for the file processed to the proper path
+(instead of a stringification of the code reference of the @INC handler that
+this module installs).
+
+Please note that if any lines were removed from the source, the path name will
+be postfixed with the string:
+
+  (skipped %d lines for persona '%s')
+
+where the %d will be filled with the number of lines skipped, and the %s will
+be filled with the persona for which the lines were removed.
 
 =head1 AUTHOR
 

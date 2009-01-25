@@ -6,4 +6,5 @@ Makefile.PL
 lib/persona.pm
 t/01basic.t
 t/10constants.t
+t/20path2source.t
 META.yml                                 Module meta-data (added by MakeMaker)

@@ -6,14 +6,11 @@ BEGIN {				# Magic Perl CORE pragma
 }
 
 # set up tests to do
-use Test::More tests => 3 + 3 + 4 + 1;
+use Test::More tests => 2 + 3 + 4 + 1;
 
 # strict and verbose as possible
 use strict;
 use warnings;
-
-# does it compile?
-BEGIN { use_ok( 'persona' ) }
 
 # set up source to check
 my $module = 'Foo';
@@ -30,6 +27,7 @@ print "one only\\n"    if !PERSONA or PERSONA eq 'one';
 print "one and two\\n" if !PERSONA or PERSONA eq 'one' or PERSONA eq 'two';
 print "not one\\n"     if !PERSONA or PERSONA ne 'one';
 print "all in Foo again\\n";
+1;
 __DATA__
 print "one should never show\\n" if !PERSONA or PERSONA eq 'one';
 print "all should never show\\n";
@@ -56,30 +54,31 @@ all in Foo again
 ALL
 
 # no interference from persona whatsoever
-open( $out, "$^X -I. $postfix" );
+my $prefix = "$^X -I.";
+open( $out, "$prefix $postfix" );
 is( readline($out), $all, "no interference" );
-open( $out, "$^X -I. -Mpersona $postfix" );
+open( $out, "$prefix -Mpersona $postfix" );
 is( readline($out), $all, "no module selected, no interference" );
-open( $out, "$^X -I. -Mpersona=only_for,Bar $postfix" );
+open( $out, "$prefix -Mpersona=only_for,Bar $postfix" );
 is( readline($out), $all, "Bar module selected, no interference" );
 
 # interference
-open( $out, "$^X -I. -Mpersona=only_for,Foo $postfix" );
+open( $out, "$prefix -Mpersona=only_for,Foo $postfix" );
 is( readline($out), $all, 'Foo module selected, no PERSONA, no interference' );
-open( $out, "PERSONA=zero $^X -I. -Mpersona=only_for,Foo $postfix" );
+open( $out, "PERSONA=zero $prefix -Mpersona=only_for,Foo $postfix" );
 is( readline($out), <<'OK', 'Foo module selected, PERSONA zero' );
 all in Foo
 not one
 all in Foo again
 OK
-open( $out, "PERSONA=one $^X -I. -Mpersona=only_for,Foo $postfix" );
+open( $out, "PERSONA=one $prefix -Mpersona=only_for,Foo $postfix" );
 is( readline($out), <<'OK', 'Foo module selected, PERSONA one' );
 all in Foo
 one only
 one and two
 all in Foo again
 OK
-open( $out, "PERSONA=two $^X -I. -Mpersona=only_for,Foo $postfix" );
+open( $out, "PERSONA=two $prefix -Mpersona=only_for,Foo $postfix" );
 is( readline($out), <<'OK', 'Foo module selected, PERSONA two' );
 all in Foo
 one and two
