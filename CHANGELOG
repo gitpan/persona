@@ -1,3 +1,10 @@
+0.08	29 January 2009
+	Added wildcard functionality to "only_for", and the possibility to
+        specify multiple "only_for"'s in on call..  Rearranged pod slightly
+	to de-emphasize command line parameter handling, as we now support
+	having persona dependent code simply in a script.  Adapted tests to
+	test for new functionalities.
+
 0.07	29 January 2009
 	Added capability to use persona filtering easily inside a script,
 	without having to resort to funny things: the funny things now happen

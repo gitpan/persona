@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # set version info
-our $VERSION  = 0.07;
+our $VERSION  = 0.08;
 
 # modules that we need
 use List::Util qw( first );
@@ -14,6 +14,7 @@ use List::Util qw( first );
 my $process_persona;
 
 # regular expression to check
+my $all;
 my @only_for;
 
 # are we debugging?
@@ -182,7 +183,7 @@ sub path2source {
 #      2 .. N attributes
 
 sub import {
-    my ( undef, %attr ) = @_;
+    my ( undef, @attr ) = @_;
 
     # find persona we need to work for
     if ( !defined $process_persona ) {
@@ -230,33 +231,55 @@ sub import {
     }
 
     # fetch parameters we know
-    my $only_for = delete $attr{only_for};
-
-    # extra parameters
-    if ( my @huh = sort keys %attr ) {
-        die "Don't know what to do with @huh";
-    }
-
-    # we have some kind of specification which modules to check
-    if ($only_for) {
-
-        # need to check what we have
-        if ( my $ref = ref $only_for ) {
-            die "Can only handle references of type '$ref'"
-              if $ref ne 'Regexp';
-
-            # it's ok
-            push @only_for, $only_for;
+    my @only_for_new;
+    my @huh;
+    while ( my ( $key, $value ) = splice @attr, 0, 2 ) {
+        if ( $key eq 'only_for' ) {
+            push @only_for_new, $value;
         }
 
-        # just a string, make it a regexp
+        # don't know what to do with this
         else {
-            push @only_for, qr#^$only_for#;
+            push @huh, $key;
+        }
+    }
+
+    # extra parameters
+    die "Don't know what to do with @{[ sort @huh ]}" if @huh;
+
+    # we have some kind of specification which modules to check
+    if (@only_for_new) {
+
+        # normalize all new settings
+      ONLY_FOR:
+        foreach my $only_for (@only_for_new) {
+
+            # need to check what we have
+            if ( my $ref = ref $only_for ) {
+                die "Can only handle references of type '$ref'"
+                  if $ref ne 'Regexp';
+    
+                # it's ok
+                push @only_for, $only_for;
+            }
+
+            # do all and everything
+            elsif ( $only_for eq '*' ) {
+                $all = 1;
+                @only_for = @only_for_new = ();
+                TELL "Look for personas in all files" if DEBUG;
+                last ONLY_FOR;
+            }
+    
+            # just a string, make it a regexp
+            else {
+                push @only_for, qr#^$only_for#;
+            }
         }
 
         TELL "Added regular expression for matching file names:\n  %s",
-          $only_for[-1],
-          if DEBUG;
+          join( "\n  ", @only_for[ -@only_for_new .. $#only_for ] ),
+          if DEBUG and @only_for_new;
     }
 
     # export constant to the caller if not done so already
@@ -282,7 +305,7 @@ sub _inc_handler {
     my ( $self, $file ) = @_;
 
     # shouldn't handle this file, let require handle it (again)
-    if ( !first { $file =~ m#$_# } @only_for ) {
+    if ( !$all and !first { $file =~ m#$_# } @only_for ) {
         TELL 'Not handling %s', $file if DEBUG > 1;
         return undef;
     }
@@ -354,7 +377,7 @@ persona - control which code will be loaded for an execution context
 
 =head1 VERSION
 
-This documentation describes version 0.07.
+This documentation describes version 0.08.
 
 =head1 DESCRIPTION
 

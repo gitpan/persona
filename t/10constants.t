@@ -6,7 +6,7 @@ BEGIN {				# Magic Perl CORE pragma
 }
 
 # set up tests to do
-use Test::More tests => 2 + 3 + 4 + 1;
+use Test::More tests => 2 + 3 + ( 2 * 4 ) + 1;
 
 # strict and verbose as possible
 use strict;
@@ -63,28 +63,35 @@ open( $out, "$prefix -Mpersona=only_for,Bar $postfix" );
 is( readline($out), $all, "Bar module selected, no interference" );
 
 # interference
-open( $out, "$prefix -Mpersona=only_for,Foo $postfix" );
-is( readline($out), $all, 'Foo module selected, no PERSONA, no interference' );
-open( $out, "PERSONA=zero $prefix -Mpersona=only_for,Foo $postfix" );
-is( readline($out), <<'OK', 'Foo module selected, PERSONA zero' );
+foreach my $only_for ( qw( Foo * ) ) {
+    my $command = "$prefix -Mpersona=only_for,$only_for $postfix";
+
+    open( $out, $command );
+    is( readline($out), $all, "$only_for module selected, no PERSONA" );
+
+    open( $out, "PERSONA=zero $command" );
+    is( readline($out), <<'OK', "$only_for module selected, PERSONA zero" );
 all in Foo
 not one
 all in Foo again
 OK
-open( $out, "PERSONA=one $prefix -Mpersona=only_for,Foo $postfix" );
-is( readline($out), <<'OK', 'Foo module selected, PERSONA one' );
+
+    open( $out, "PERSONA=one $command" );
+    is( readline($out), <<'OK', "$only_for module selected, PERSONA one" );
 all in Foo
 one only
 one and two
 all in Foo again
 OK
-open( $out, "PERSONA=two $prefix -Mpersona=only_for,Foo $postfix" );
-is( readline($out), <<'OK', 'Foo module selected, PERSONA two' );
+
+    open( $out, "PERSONA=two $command" );
+    is( readline($out), <<'OK', "$only_for module selected, PERSONA two" );
 all in Foo
 one and two
 not one
 all in Foo again
 OK
+}
 
 # we're done
 ok( unlink($filename), 'remove module' );
