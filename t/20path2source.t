@@ -6,14 +6,11 @@ BEGIN {				# Magic Perl CORE pragma
 }
 
 # set up tests to do
-use Test::More tests => 3 + 1 + 2 + 2 + 2 + 1;
+use Test::More tests => 2 + 1 + 2 + 2 + 2 + 1;
 
 # strict and verbose as possible
 use strict;
 use warnings;
-
-# does it compile?
-BEGIN { use_ok( 'persona' ) }
 
 # set up source to check
 my $module = 'Foo';
@@ -46,7 +43,7 @@ $/ = undef;
 
 # set up string components
 my $prefix  =
-  qq/$^X -Mpersona -e 'print scalar \${ persona->path2source("$filename/;
+  qq/$^X -Ilib -Mpersona -e 'print scalar \${ persona->path2source("$filename/;
 my $postfix =
   qq/") }' 2>&1 |/;
 

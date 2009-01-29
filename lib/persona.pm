@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # set version info
-our $VERSION  = 0.06;
+our $VERSION  = 0.07;
 
 # modules that we need
 use List::Util qw( first );
@@ -165,7 +165,6 @@ sub path2source {
         # we'll do this line
         $source .= $line;
     }
-
     # show source if *really* debugging
     TELL $source if DEBUG > 2;
 
@@ -202,9 +201,30 @@ sub import {
         # create constant in main (for easy access later)
         die $@ if !eval "sub main::PERSONA () { '$process_persona' }; 1";
 
-        # install handler if we have a persona
+        # we have a persona, great!
         if ($process_persona) {
+
+            # install handler if we have a persona
             unshift @INC, \&_inc_handler;
+
+            # we're being called in a script
+            if ( !( () = caller(3) )               # only 2 levels below us
+                 and ( (caller(0))[1] ne '-e' )    # not a one liner
+                 and ( (caller(2))[3] eq '(eval)'  # but an eval at lowest level
+               ) ) {
+
+                # make sure we will process this file
+                unshift @only_for, qr#^$0$#;  ## syn hilite
+
+                # do the script, but through the @INC handler
+                TELL 'Recursively calling script for "%s"', $process_persona
+                  if DEBUG;
+                do $0;
+
+                # we're done, nothing left to do at this level
+                exit;
+            }
+
             TELL 'Interpreting source code as "%s"', $process_persona if DEBUG;
         }
     }
@@ -285,6 +305,7 @@ sub _inc_handler {
     return undef if !$source or !$skipped;
 
     # set %INC correctly
+    $path =~ s#^\./##; # normalize just as perl does
     $INC{$file} =
       "$path (skipped $skipped lines for persona '$process_persona')";
 
@@ -333,7 +354,7 @@ persona - control which code will be loaded for an execution context
 
 =head1 VERSION
 
-This documentation describes version 0.06.
+This documentation describes version 0.07.
 
 =head1 DESCRIPTION
 

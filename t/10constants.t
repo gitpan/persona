@@ -54,7 +54,7 @@ all in Foo again
 ALL
 
 # no interference from persona whatsoever
-my $prefix = "$^X -I.";
+my $prefix = "$^X -Ilib";
 open( $out, "$prefix $postfix" );
 is( readline($out), $all, "no interference" );
 open( $out, "$prefix -Mpersona $postfix" );

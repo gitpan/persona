@@ -51,7 +51,7 @@ ok( close($out), "flushed ok to disk" );
 $/ = undef;
 
 # ok string if there is no interference
-my $postfix = "-M$module -e1 2>&1 |";
+my $postfix = "-Ilib -M$module -e1 2>&1 |";
 my $all = <<"ALL";
 all in Foo
 one only
