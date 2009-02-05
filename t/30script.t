@@ -46,9 +46,10 @@ ok( close($out), "flushed ok to disk" );
 # always slurp
 $/ = undef;
 
-# interference
-my $command = "$^X $filename 2>&1 |";
-open( $out, $command );
+# no interference
+my $prefix  = "$^X -I. -Ilib";
+my $postfix = "$filename 2>&1 |";
+open( $out, "$prefix $postfix" );
 is( readline($out), <<'OK', 'no PERSONA, no interference' );
 all in Foo
 one only
@@ -56,20 +57,26 @@ one and two
 not one
 all in Foo again
 OK
-open( $out, "PERSONA=zero $command" );
-is( readline($out), <<'OK', 'PERSONA zero' );
+
+# interference
+{
+    local $ENV{PERSONA} = 'zero'; # use perl to pass ENV to child process
+    open( $out, "$prefix $postfix" );
+    is( readline($out), <<'OK', 'PERSONA zero' );
 all in Foo
 not one
 all in Foo again
 OK
-open( $out, "PERSONA=one $command" );
+}
+
+open( $out, "$prefix -Mpersona=one $postfix" );
 is( readline($out), <<'OK', 'PERSONA one' );
 all in Foo
 one only
 one and two
 all in Foo again
 OK
-open( $out, "PERSONA=two $command" );
+open( $out, "$prefix -Mpersona=two $postfix" );
 is( readline($out), <<'OK', 'PERSONA two' );
 all in Foo
 one and two

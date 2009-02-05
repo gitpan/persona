@@ -52,8 +52,10 @@ open( $out, "$prefix$postfix" );
 is( readline($out), $source, 'no persona, no interference' );
 
 # persona zero
-foreach ( qq{PERSONA=zero $prefix$postfix}, qq{$prefix","zero$postfix} ) {
-    open( $out, $_ );
+foreach ( '', qq{","zero} ) {
+    local $ENV{PERSONA} = $_ ? '' : 'zero';
+
+    open( $out, "$prefix$_$postfix" );
     is( readline($out), <<'OK', 'PERSONA zero' );
 all
 #line 7 Foo.pm (all but persona 'one')
@@ -69,8 +71,10 @@ OK
 }
 
 # persona one
-foreach ( qq{PERSONA=one $prefix$postfix}, qq{$prefix","one$postfix} ) {
-    open( $out, $_ );
+foreach ( '', qq{","one} ) {
+    local $ENV{PERSONA} = $_ ? '' : 'one';
+
+    open( $out, "$prefix$_$postfix" );
     is( readline($out), <<'OK', 'PERSONA one' );
 all
 #PERSONA one
@@ -88,8 +92,10 @@ OK
 }
 
 # persona two
-foreach ( qq{PERSONA=two $prefix$postfix}, qq{$prefix","two$postfix} ) {
-    open( $out, $_ );
+foreach ( '', qq{","two} ) {
+    local $ENV{PERSONA} = $_ ? '' : 'two';
+
+    open( $out, "$prefix$_$postfix" );
     is( readline($out), <<'OK', 'PERSONA two' );
 all
 #line 5 Foo.pm (allowed by persona 'two')

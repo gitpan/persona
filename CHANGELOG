@@ -1,3 +1,11 @@
+0.09	5 February 2009
+	Fixed test-suite so we don't die on OS's that don't support setting
+	environment variables on the commandline, such as Win*.
+
+	30 January 2009
+	Fixed test-suite so that any existing script by the name 'foo' does
+	not interfere with our 'foo' for testing script behaviour.
+
 0.08	29 January 2009
 	Added wildcard functionality to "only_for", and the possibility to
         specify multiple "only_for"'s in on call..  Rearranged pod slightly

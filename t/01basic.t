@@ -61,8 +61,10 @@ all in Foo again
 ALL
 
 # no interference from persona whatsoever
-foreach ( '', 'PERSONA=zero ', 'PERSONA=one ', 'PERSONA=two ' ) {
-    my $prefix .= "$_$^X -I.";
+foreach ( '', 'zero', 'one', 'two' ) {
+    local $ENV{PERSONA} = $_;
+
+    my $prefix .= "$^X -I.";
     open( $out, "$prefix $postfix" );
     is( readline($out), $all, "$prefix no interference" );
     open( $out, "$prefix -Mpersona $postfix" );
@@ -73,25 +75,32 @@ foreach ( '', 'PERSONA=zero ', 'PERSONA=one ', 'PERSONA=two ' ) {
 
 # interference
 foreach my $only_for ( qw( Foo * ) ) {
+    local $ENV{PERSONA};
+
     my $command = "$^X -I. -Mpersona=only_for,$only_for $postfix";
 
     open( $out, $command );
     is( readline($out), $all, "$only_for module selected, no PERSONA" );
 
-    open( $out, "PERSONA=zero $command" );
+    $ENV{PERSONA} = 'zero';
+    open( $out, $command );
     is( readline($out), <<'OK', "Foo module selected, PERSONA zero" );
 all in Foo
 not one
 all in Foo again
 OK
-    open( $out, "PERSONA=one $command" );
+
+    $ENV{PERSONA} = 'one';
+    open( $out, $command );
     is( readline($out), <<'OK', "Foo module selected, PERSONA one" );
 all in Foo
 one only
 one and two
 all in Foo again
 OK
-    open( $out, "PERSONA=two $command" );
+
+    $ENV{PERSONA} = 'two';
+    open( $out, $command );
     is( readline($out), <<'OK', "Foo module selected, PERSONA two" );
 all in Foo
 one and two

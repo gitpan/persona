@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # set version info
-our $VERSION  = 0.08;
+our $VERSION  = 0.09;
 
 # modules that we need
 use List::Util qw( first );
@@ -185,11 +185,42 @@ sub path2source {
 sub import {
     my ( undef, @attr ) = @_;
 
+    # assume we want to set persona if only one parameter
+    unshift @attr, 'persona' if @attr == 1;
+
+    # fetch name's name
+    my $name = $ENV{ENV_PERSONA} || 'PERSONA';
+
+    # fetch parameters we know
+    my @only_for_new;
+    my @huh;
+    while ( my ( $key, $value ) = splice @attr, 0, 2 ) {
+
+        # setting module specification 
+        if ( $key eq 'only_for' ) {
+            push @only_for_new, $value;
+        }
+
+        # setting persona
+        elsif ( $key eq 'persona' ) {
+
+            # huh?
+            die "Already have '$process_persona' as persona, "
+              . "cannot specify '$value' now"
+              if defined $process_persona and $value ne $process_persona;
+
+            $ENV{$name} = $value;
+        }
+
+        # don't know what to do with this
+        else {
+            push @huh, $key;
+        }
+    }
+
     # find persona we need to work for
     if ( !defined $process_persona ) {
-        $process_persona = $ENV{ENV_PERSONA}
-          ? $ENV{ $ENV{ENV_PERSONA} }
-          : $ENV{PERSONA};
+        $process_persona = $ENV{$name};
 
         # too bad, we don't have a persona
         $process_persona = '' if !defined $process_persona;
@@ -209,7 +240,7 @@ sub import {
             unshift @INC, \&_inc_handler;
 
             # we're being called in a script
-            if ( !( () = caller(3) )               # only 2 levels below us
+            if ( !( () = caller(3) )               # only 3 levels below us
                  and ( (caller(0))[1] ne '-e' )    # not a one liner
                  and ( (caller(2))[3] eq '(eval)'  # but an eval at lowest level
                ) ) {
@@ -227,20 +258,6 @@ sub import {
             }
 
             TELL 'Interpreting source code as "%s"', $process_persona if DEBUG;
-        }
-    }
-
-    # fetch parameters we know
-    my @only_for_new;
-    my @huh;
-    while ( my ( $key, $value ) = splice @attr, 0, 2 ) {
-        if ( $key eq 'only_for' ) {
-            push @only_for_new, $value;
-        }
-
-        # don't know what to do with this
-        else {
-            push @huh, $key;
         }
     }
 
@@ -352,12 +369,12 @@ persona - control which code will be loaded for an execution context
 
 =head1 SYNOPSIS
 
-  $ PERSONA=cron perl -Mpersona=only_for,Foo foo.pl
+  $ PERSONA=cron perl foo.pl
 
   foo.pl
   =================
+  use persona only_for => '*';  # all modules, maybe regex
   use Foo;
-
 
   Foo.pm
   =================
@@ -377,7 +394,7 @@ persona - control which code will be loaded for an execution context
 
 =head1 VERSION
 
-This documentation describes version 0.08.
+This documentation describes version 0.09.
 
 =head1 DESCRIPTION
 
@@ -466,6 +483,17 @@ C<cron>.  Finally, it is possible to have code compiled for a set of personas:
 would make the subroutine C<for_cron_and_backoffice> available for the personas
 C<cron> and C<backoffice>.
 
+If you're lazy, and you don't care about any overhead while compiling code,
+you can indicate that you want B<all> modules checked for PERSONA specific
+code by specifying C<'*'> as the indication of which files should be checked.
+
+ use persona only_for => '*';
+
+If you want to specify multiple conditions, you can specify C<only_for> more
+than once:
+
+ use persona only_for => 'Foo', only_for => 'Bar';
+
 To facilitate more complex persona dependencies, all namespaces seen by this
 module automatically have the constant PERSONA imported into it.  This allows
 the constant to be used in actual code (which will then be optimized away by
@@ -488,6 +516,27 @@ set.  Another example from L<Class::DBI> / L<DBIx::Class>::
 which will only use all columns when executing as the backoffice persona.
 Otherwise only a subset of columns will be available.
 
+=head1 SPECIFYING PERSONA WITHOUT ENVIRONMENT VARIABLES
+
+In order to be able to easily support operating systems that have shells that
+do not support easy setting of environment variables on the command line, you
+can also specify the persona from the command line while loading this module:
+
+ $ perl -Mpersona=cron bar.pl
+
+will run set the persona to "cron".  This can also be combined with other
+parameters, such as:
+
+ $ perl -Mpersona=only_for,*,persona,cron bar.pl
+
+would process all files loaded for the C<cron> persona.  Alternately, the same
+is possible in source:
+
+ use persona 'cron';
+
+would select the C<cron> persona, but only if no other persona was selected
+before.
+
 =head1 EXAMPLES
 
 The test-suite contains some examples.  More to be added as time permits.
@@ -504,6 +553,11 @@ If there is a non-empty persona value specified, then an C<@INC> handler is
 installed.  This handler is offered each file that is C<require>d or C<use>d
 from that moment onward.  If it is B<not> a file that should be checked for
 persona conditional code, it is given back to the normal C<require> handling.
+
+If the import method determines it is being called from a script that is being
+called from the command line, it will C<do> the script and then C<exit>.
+This causes the script itself be called with C<require>, and thus be handled
+by the C<@INC> handler we installed.
 
 If it B<is> a file that should be checked, it is searched in the C<@INC>
 array.  If found, it is opened and all the lines that should be part of the
