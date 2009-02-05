@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # set version info
-our $VERSION  = 0.09;
+our $VERSION  = '0.10';
 
 # modules that we need
 use List::Util qw( first );
@@ -60,6 +60,17 @@ sub path2source {
     open( my $handle, '<', $path ) or return;
     TELL 'Parsing %s', $path if DEBUG;
 
+    # no persona, so we don't need to do any parsing at all
+    if ( !$persona ) {
+
+        # enable slurp mode
+        local $/;
+        my $source = <$handle>;
+
+        # we're done
+        return wantarray ? ( \$source, 0 ) : \$source;
+    }
+
     # initializations
     my $skipped = 0;
     my $done;
@@ -109,32 +120,32 @@ sub path2source {
                 }
             }
 
-            # we have a negation
-            elsif ( $rest =~ m#^!\s*(\w+)\s*$# ) { ## syn hilite
+            # we have an expression
+            else {
 
-                # all but the current persona
-                if ( $1 eq $persona ) {
+                # huh?
+                die "Found illegal characters in PERSONA specification:\n$rest"
+                  if $rest =~ m#[^\w\s\(\)\|!]#;
+
+                # change simple list into expression
+                1 while $rest =~ s#(?<!\!)(\w+)\s+(\w+)#$1 || $2#;
+
+                # create evallable expression
+                my %value = ( $persona => 1 );
+                $rest =~ s#(\w+)# $value{$1} || 0 #ge;
+
+                # evaluate expression
+                my $ok = eval $rest;
+                die "Error in evaluation persona specification:\n'$rest'\n$@"
+                  if $@;
+
+                # stop copying code for now
+                if ( !$ok ) {
                     $active  = undef;
                 }
 
                 # switching from inactive persona to all
                 elsif ( !$active ) {
-                    $active = 1;
-
-                    # make sure errors / stack traces have right line info
-                    $source .= sprintf "#line %d %s (all but persona '%s')\n",
-                      $line_nr + 1, $path, $1;
-
-                    # don't bother adding the line with #PERSONA
-                    next LINE;
-                }
-            }
-
-            # we need to allow for this persona
-            elsif ( $rest =~ m#\b$persona\b# ) {
-
-                # switching from inactive persona to active one
-                if ( !$active ) {
                     $active = 1;
 
                     # make sure errors / stack traces have right line info
@@ -145,11 +156,6 @@ sub path2source {
                     # don't bother adding the line with #PERSONA
                     next LINE;
                 }
-            }
-
-            # don't allow for this persona
-            else {
-                $active  = undef;
             }
         }
 
@@ -381,7 +387,7 @@ persona - control which code will be loaded for an execution context
   package Foo;
   # code to be compiled always
 
-  #PERSONA cron app book
+  #PERSONA cron || app || book
   # code to be compiled only for the "cron", "app" and "book" personas
 
   #PERSONA
@@ -390,11 +396,14 @@ persona - control which code will be loaded for an execution context
   #PERSONA !cron
   # code to be compiled for all personas except "cron"
 
+  #PERSONA !( app || book )
+  # code to be compiled for all personas except "app" and "book"
+
   my $limit = PERSONA eq 'app' ? 100 : 10; # code using the constant
 
 =head1 VERSION
 
-This documentation describes version 0.09.
+This documentation describes version 0.10.
 
 =head1 DESCRIPTION
 
@@ -472,9 +481,9 @@ one:
  #PERSONA
 
 would make the subroutine C<not_for_cron> available for personas B<except>
-C<cron>.  Finally, it is possible to have code compiled for a set of personas:
+C<cron>.  It is also possible to have code compiled for a set of personas:
 
- #PERSONA cron backoffice
+ #PERSONA cron || backoffice
  sub for_cron_and_backoffice {
      # code...
  }
@@ -482,6 +491,19 @@ C<cron>.  Finally, it is possible to have code compiled for a set of personas:
 
 would make the subroutine C<for_cron_and_backoffice> available for the personas
 C<cron> and C<backoffice>.
+
+Or it is possible to have code compiled for all personas B<except> for a
+set of personas:
+
+ #PERSONA !( app || book )
+ sub not_for_app_or_book {
+     # code...
+ }
+would make the subroutine C<not_for_app_or_book> available for all personas
+B<except> C<app> and C<book>.
+
+Basically any valid expression consisting of C< \\w \\s ( ) ! || > is allowed:
+if that expression yields a true value, then that code will be compiled.
 
 If you're lazy, and you don't care about any overhead while compiling code,
 you can indicate that you want B<all> modules checked for PERSONA specific

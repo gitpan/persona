@@ -58,7 +58,7 @@ foreach ( '', qq{","zero} ) {
     open( $out, "$prefix$_$postfix" );
     is( readline($out), <<'OK', 'PERSONA zero' );
 all
-#line 7 Foo.pm (all but persona 'one')
+#line 7 Foo.pm (allowed by persona 'zero')
 not one
 #PERSONA
 all again

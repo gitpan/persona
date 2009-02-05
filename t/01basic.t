@@ -30,6 +30,8 @@ print "one only\\n";
 print "one and two\\n";
 #PERSONA !one
 print "not one\\n";
+#PERSONA !( zero || one )
+print "not zero or one\\n";
 #PERSONA
 print "all in Foo again\\n";
 1;
@@ -57,6 +59,7 @@ all in Foo
 one only
 one and two
 not one
+not zero or one
 all in Foo again
 ALL
 
@@ -105,6 +108,7 @@ OK
 all in Foo
 one and two
 not one
+not zero or one
 all in Foo again
 OK
 }
