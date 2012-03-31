@@ -1,3 +1,7 @@
+0.11	31 March 2012
+	Some pod fixes and brought up to current code esthetics.  Also checked
+	it runs on 5.14.2 threaded and unthreaded.
+
 0.10	6 February 2009
 	Added support for more complex persona specifications, specifically
 	!( foo || bar ) to indicate that code should be compiled for all

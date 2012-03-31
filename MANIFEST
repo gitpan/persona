@@ -8,4 +8,5 @@ t/01basic.t
 t/10constants.t
 t/20path2source.t
 t/30script.t
-META.yml                                 Module meta-data (added by MakeMaker)
+META.yml                                 Module YAML meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)

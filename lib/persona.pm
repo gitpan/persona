@@ -1,11 +1,10 @@
 package persona;
 
+$VERSION= '0.11';
+
 # be as strict and verbose as possible
 use strict;
 use warnings;
-
-# set version info
-our $VERSION  = '0.10';
 
 # modules that we need
 use List::Util qw( first );
@@ -19,14 +18,14 @@ my @only_for;
 
 # are we debugging?
 BEGIN {
-    my $debug = $ENV{DEBUG} || 0;
-    $debug = 0 if $debug !~ m#^[0-9]+$#; ## only numeric constants
+    my $debug= $ENV{DEBUG} || 0;
+    $debug= 0 if $debug !~ m#^[0-9]+$#; ## only numeric constants
     eval "sub DEBUG () { $debug }";
 }    #BEGIN
 
 # log pipe if we're debugging
 BEGIN {
-    *TELL = DEBUG
+    *TELL= DEBUG
        ? sub {
              my $format = shift() . "\n";
              printf STDERR $format, @_;
@@ -53,8 +52,8 @@ BEGIN {
 #      2 number of lines skipped (optional)
 
 sub path2source {
-    my ( undef, $path, $persona ) = @_;
-    $persona = $process_persona if !defined $persona;
+    my ( undef, $path, $persona )= @_;
+    $persona= $process_persona if !defined $persona;
 
     # could not open file, let the outside handle this
     open( my $handle, '<', $path ) or return;
@@ -65,23 +64,23 @@ sub path2source {
 
         # enable slurp mode
         local $/;
-        my $source = <$handle>;
+        my $source= readline $handle;
 
         # we're done
         return wantarray ? ( \$source, 0 ) : \$source;
     }
 
     # initializations
-    my $skipped = 0;
     my $done;
-    my $active  = 1;
-    my $line_nr = 0;
-    my $source  = '';
+    my $skipped= 0;
+    my $active=  1;
+    my $line_nr= 0;
+    my $source=  '';
 
     # until we reach end of file
   LINE:
     while (1) {
-        my $line = readline $handle;
+        my $line= readline $handle;
         last LINE if !defined $line;
 
         # seen __END__ or __DATA__, no further looking needed here
@@ -92,7 +91,7 @@ sub path2source {
 
         # reached the end of logical code, continue without further looking
         elsif ( $line =~ m#^__(?:DATA|END)__$# ) {  ## syn hilite
-            $done = 1;
+            $done= 1;
             $source .= $line;
             next LINE;
         }
@@ -102,14 +101,14 @@ sub path2source {
 
         # code for new persona?
         if ( $line =~ m/^#PERSONA\s*(.*)/ ) {
-            my $rest = $1;
+            my $rest= $1;
 
             # all personas
             if ( !$rest ) {
 
                 # switching from inactive persona to all
                 if ( !$active ) {
-                    $active = 1;
+                    $active= 1;
 
                     # make sure errors / stack traces have right line info
                     $source .= sprintf "#line %d %s (all personas)\n",
@@ -131,22 +130,22 @@ sub path2source {
                 1 while $rest =~ s#(?<!\!)(\w+)\s+(\w+)#$1 || $2#;
 
                 # create evallable expression
-                my %value = ( $persona => 1 );
+                my %value= ( $persona => 1 );
                 $rest =~ s#(\w+)# $value{$1} || 0 #ge;
 
                 # evaluate expression
-                my $ok = eval $rest;
+                my $ok= eval $rest;
                 die "Error in evaluation persona specification:\n'$rest'\n$@"
                   if $@;
 
                 # stop copying code for now
                 if ( !$ok ) {
-                    $active  = undef;
+                    $active= undef;
                 }
 
                 # switching from inactive persona to all
                 elsif ( !$active ) {
-                    $active = 1;
+                    $active= 1;
 
                     # make sure errors / stack traces have right line info
                     $source .=
@@ -165,8 +164,8 @@ sub path2source {
         # new package, make sure it knows about PERSONA if it doesn't yet
         if ( $line =~ m#^\s*package\s+([\w:]+)\s*;# ) {
             no strict 'refs';
-            my $sub = $1 . '::PERSONA';
-            *{$sub} = \&main::PERSONA if !exists &$sub;
+            my $sub= $1 . '::PERSONA';
+            *{$sub}= \&main::PERSONA if !exists &$sub;
         }
 
         # we'll do this line
@@ -176,7 +175,7 @@ sub path2source {
     TELL $source if DEBUG > 2;
 
     return wantarray ? ( \$source, $skipped ) : \$source;
-}    #path2source
+} #path2source
 
 #-------------------------------------------------------------------------------
 #
@@ -189,13 +188,13 @@ sub path2source {
 #      2 .. N attributes
 
 sub import {
-    my ( undef, @attr ) = @_;
+    my ( undef, @attr )= @_;
 
     # assume we want to set persona if only one parameter
     unshift @attr, 'persona' if @attr == 1;
 
     # fetch name's name
-    my $name = $ENV{ENV_PERSONA} || 'PERSONA';
+    my $name= $ENV{ENV_PERSONA} || 'PERSONA';
 
     # fetch parameters we know
     my @only_for_new;
@@ -215,7 +214,7 @@ sub import {
               . "cannot specify '$value' now"
               if defined $process_persona and $value ne $process_persona;
 
-            $ENV{$name} = $value;
+            $ENV{$name}= $value;
         }
 
         # don't know what to do with this
@@ -226,10 +225,10 @@ sub import {
 
     # find persona we need to work for
     if ( !defined $process_persona ) {
-        $process_persona = $ENV{$name};
+        $process_persona= $ENV{$name};
 
         # too bad, we don't have a persona
-        $process_persona = '' if !defined $process_persona;
+        $process_persona= '' if !defined $process_persona;
 
         # force some sanity
         die "Persona may only contain alphanumeric characters,"
@@ -246,7 +245,7 @@ sub import {
             unshift @INC, \&_inc_handler;
 
             # we're being called in a script
-            if ( !( () = caller(3) )               # only 3 levels below us
+            if ( !( ()= caller(3) )                # only 3 levels below us
                  and ( (caller(0))[1] ne '-e' )    # not a one liner
                  and ( (caller(2))[3] eq '(eval)'  # but an eval at lowest level
                ) ) {
@@ -278,7 +277,7 @@ sub import {
         foreach my $only_for (@only_for_new) {
 
             # need to check what we have
-            if ( my $ref = ref $only_for ) {
+            if ( my $ref= ref $only_for ) {
                 die "Can only handle references of type '$ref'"
                   if $ref ne 'Regexp';
     
@@ -288,8 +287,8 @@ sub import {
 
             # do all and everything
             elsif ( $only_for eq '*' ) {
-                $all = 1;
-                @only_for = @only_for_new = ();
+                $all= 1;
+                @only_for= @only_for_new= ();
                 TELL "Look for personas in all files" if DEBUG;
                 last ONLY_FOR;
             }
@@ -307,8 +306,8 @@ sub import {
 
     # export constant to the caller if not done so already
     no strict 'refs';
-    my $sub = caller() . '::PERSONA';
-    *{$sub} = \&main::PERSONA if !exists &$sub;
+    my $sub= caller() . '::PERSONA';
+    *{$sub}= \&main::PERSONA if !exists &$sub;
 
     return;
 } #import
@@ -325,7 +324,7 @@ sub import {
 # OUT: 1 handle to read source from
 
 sub _inc_handler {
-    my ( $self, $file ) = @_;
+    my ( $self, $file )= @_;
 
     # shouldn't handle this file, let require handle it (again)
     if ( !$all and !first { $file =~ m#$_# } @only_for ) {
@@ -334,29 +333,29 @@ sub _inc_handler {
     }
 
     # can't find ourselves?
-    my $first = first { $INC[$_] eq $self } 0 .. $#INC;
+    my $first= first { $INC[$_] eq $self } 0 .. $#INC;
     die "Could not find INC handler in @INC" if !defined $first;
 
     # could not find file, let require handle it (again)
-    my $path = first { -e } map { "$INC[$_]/$file" } $first + 1 .. $#INC;
+    my $path= first { -e } map { "$INC[$_]/$file" } $first + 1 .. $#INC;
     if ( !$path ) {
         TELL 'Could not find %s', $file if DEBUG > 1;
         return undef;
     }
 
     # parse the source
-    my ( $source, $skipped ) = __PACKAGE__->path2source($path);
+    my ( $source, $skipped )= __PACKAGE__->path2source($path);
 
     # could not open file, or nothing skipped, let -require- handle it
     return undef if !$source or !$skipped;
 
     # set %INC correctly
     $path =~ s#^\./##; # normalize just as perl does
-    $INC{$file} =
+    $INC{$file}=
       "$path (skipped $skipped lines for persona '$process_persona')";
 
     # make sure that __FILE__ will be correct as well
-    $$source = "#line 1 $path\n$$source";
+    $$source= "#line 1 $path\n$$source";
 
     # convert source to handle, so require can handle it
     open( my $require, '<', $source )
@@ -403,7 +402,7 @@ persona - control which code will be loaded for an execution context
 
 =head1 VERSION
 
-This documentation describes version 0.10.
+This documentation describes version 0.11.
 
 =head1 DESCRIPTION
 
@@ -487,7 +486,7 @@ C<cron>.  It is also possible to have code compiled for a set of personas:
  sub for_cron_and_backoffice {
      # code...
  }
- PERSONA
+ #PERSONA
 
 would make the subroutine C<for_cron_and_backoffice> available for the personas
 C<cron> and C<backoffice>.
@@ -662,7 +661,7 @@ Developed for the mod_perl environment at Booking.com.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2009 Elizabeth Mattijsen <liz@dijkmat.nl>. All rights
+Copyright (c) 2009, 2012 Elizabeth Mattijsen <liz@dijkmat.nl>. All rights
 reserved.  This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
