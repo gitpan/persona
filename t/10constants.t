@@ -22,15 +22,15 @@ use warnings;
 
 use persona;
 
-print "all in Foo\\n";
-print "one only\\n"    if !PERSONA or PERSONA eq 'one';
-print "one and two\\n" if !PERSONA or PERSONA eq 'one' or PERSONA eq 'two';
-print "not one\\n"     if !PERSONA or PERSONA ne 'one';
-print "all in Foo again\\n";
+print "all in Foo\$/";
+print "one only\$/"    if !PERSONA or PERSONA eq 'one';
+print "one and two\$/" if !PERSONA or PERSONA eq 'one' or PERSONA eq 'two';
+print "not one\$/"     if !PERSONA or PERSONA ne 'one';
+print "all in Foo again\$/";
 1;
 __DATA__
-print "one should never show\\n" if !PERSONA or PERSONA eq 'one';
-print "all should never show\\n";
+print "one should never show\$/" if !PERSONA or PERSONA eq 'one';
+print "all should never show\$/";
 SRC
 
 # make sure we have it as a file

@@ -19,21 +19,21 @@ use warnings;
 
 use persona;
 
-print "all in Foo\\n";
+print "all in Foo\$/";
 #PERSONA one
-print "one only\\n";
+print "one only\$/";
 #PERSONA one two
-print "one and two\\n";
+print "one and two\$/";
 #PERSONA !one
-print "not one\\n";
+print "not one\$/";
 #PERSONA
-print "all in Foo again\\n";
+print "all in Foo again\$/";
 1;
 __END__
 #PERSONA one
-print "one should never show\\n";
+print "one should never show\$/";
 #PERSONA
-print "all should never show\\n";
+print "all should never show\$/";
 SRC
 
 # make sure we have it as a file
